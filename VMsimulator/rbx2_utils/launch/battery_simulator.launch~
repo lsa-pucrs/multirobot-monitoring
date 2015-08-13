@@ -1,0 +1,21 @@
+<launch>
+   <arg name="battery_runtime" default="60"/> 
+
+   <node pkg="rbx2_utils" name="battery_simulator" type="battery_simulator.py" output="screen" clear_params="true">
+     <param name="rate" value="5" />
+     <param name="battery_runtime" value="$(arg battery_runtime)" />
+   </node>
+
+   <!-- Load diagnostics -->
+   <node pkg="diagnostic_aggregator" type="aggregator_node"
+      name="diag_agg" >
+  <rosparam command="load" 
+            file="$(find diagnostic_aggregator)/config/diagnostics.yaml" />
+   <!-- /opt/ros/hydro/share/diagnostic_aggregator/config -->
+</node>
+
+   <node pkg="rqt_robot_monitor" type="rqt_robot_monitor" name="rqt_robot_monitor" />
+   
+
+
+</launch>

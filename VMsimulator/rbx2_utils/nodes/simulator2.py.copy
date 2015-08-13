@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+
+import roslib; # roslib.load_manifest('pr2_motors_analyzer')
+
+import rospy, random, md5
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
+
+def simulator():
+        # Build the diagnostics array message
+        msg = DiagnosticArray()
+        msg.header.stamp = rospy.Time.now()
+        for cont in range(1,3):
+	    status = DiagnosticStatus()
+	    status.name = "Motor " + str(cont)
+	    status.hardware_id = md5.new(str(status.name)).hexdigest()
+	    random.seed()
+	    level = random.randint(0, 100)
+	    #print level
+	    if level < 80:
+		status.message = 'Running'
+		status.level = DiagnosticStatus.OK
+	    elif level < 95:
+		status.message = 'Running with issues'
+		status.level = DiagnosticStatus.WARN
+	    else:
+		status.message = 'Stopped'
+		status.level = DiagnosticStatus.ERROR
+
+	    msg.status.append(status)
+		    
+	return msg
+
+def battery():
+            # Initialize the diagnostics status
+            status = DiagnosticStatus()
+            status.name = "Battery Level"
+
+	    current_battery_level = random.randint(1, 80)
+
+	    if current_battery_level < error_battery_level:
+		status.message = "Low Battery"
+		status.level = DiagnosticStatus.ERROR
+	    elif current_battery_level < warn_battery_level:
+		status.message = "Medium Battery"
+		status.level = DiagnosticStatus.WARN     
+	    else:
+		status.message = "Battery OK"
+		status.level = DiagnosticStatus.OK
+            
+            # Add the raw battery level to the diagnostics message
+            status.values.append(KeyValue("Battery Level", str(current_battery_level)))
+            
+            # Build the diagnostics array message
+            msg = DiagnosticArray()
+            msg.header.stamp = rospy.Time.now()
+            msg.status.append(status)
+
+            return msg
+
+if __name__ == '__main__':
+    # The intial battery level - 100 is considered full charge
+    initial_battery_level = 100
+
+    # Error battery level for diagnostics
+    error_battery_level = 20
+
+    # Warn battery level for diagnostics
+    warn_battery_level = 50
+
+    rospy.init_node('simulator2')
+
+    pub = rospy.Publisher('/diagnostics', DiagnosticArray)
+    
+
+    # Publish first result (before start looping)
+    msg = simulator()
+    msg2 = battery()
+    print '#################################################'
+    print 'Publish first result (before start looping)'
+    print msg
+    print msg2
+    print '#################################################'
+    my_rate = rospy.Rate(1)
+    pub.publish(msg)
+    pub.publish(msg2)
+    my_rate.sleep()
+    loop = 0
+    my_rate = rospy.Rate(0.1)
+    while not rospy.is_shutdown():
+
+        msg = simulator()
+        msg2 = battery()
+        print '#################################################'
+        print 'Loop started ' + str(loop)
+	print msg
+	print msg2
+        print '#################################################'
+
+        pub.publish(msg)
+        pub.publish(msg2)
+        my_rate.sleep()
+        loop = loop + 1
+

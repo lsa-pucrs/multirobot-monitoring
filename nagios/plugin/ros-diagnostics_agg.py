@@ -22,6 +22,8 @@ UNKNOWN = -1
 OK = 0
 WARNING = 1
 CRITICAL = 2
+STALE = 3
+COUNT_sensors = 0
 
 # TEMPLATE FOR READING PARAMETERS FROM COMMANDLINE
 parser = OptionParser()
@@ -36,6 +38,7 @@ total_level = None
 OK_sensors = None
 WARNING_sensors = None
 CRITICAL_sensors = None
+STALE_sensors = None
 
 
 def callback_kobuki(data):
@@ -43,20 +46,14 @@ def callback_kobuki(data):
     global OK_sensors
     global WARNING_sensors
     global CRITICAL_sensors
+    global STALE_sensors
+    global COUNT_sensors
 
     ready = False
 
     while not ready:
         for current in data.status:
-          # Debug all information  
-          #from pprint import pprint
-          #pprint(options.host)
-
-          # Filter if name is received
-          #print str("Name: ") + str(options.name)
-          # replace this if by == all or contain substring options.name
-          #print("current.name = " + str(current.name) + " options.name = " + str(options.name))
-          #print(options.name in current.name )
+          from pprint import pprint
           if (options.name == "all" or options.name in current.name):
 
               # Calculate the total level
@@ -64,13 +61,10 @@ def callback_kobuki(data):
                 total_level = current.level
 
               # Parse current.name string and keep only the part after the : 
-              #parse_name = current.name.split(":")
-              #parse_name = str(parse_name[1])
-              #parse_name = parse_name.lstrip()
               parse_name = current.name
-              #pprint(parse_name)
-              #current.name = current.name.split(":")
 
+              # Count how many sensors were found
+              COUNT_sensors = COUNT_sensors + 1
 
               # Create CRITICAL sensors list
               if current.level == CRITICAL:
@@ -91,25 +85,40 @@ def callback_kobuki(data):
                   if OK_sensors != None:
                     OK_sensors = str(OK_sensors) + str(parse_name) + str(', ')
                   else:
-                    OK_sensors = str(parse_name) + str(', ')               
+                    OK_sensors = str(parse_name) + str(', ')       
+              
+              # Create STALE sensors list
+              if current.level == STALE:
+                  if STALE_sensors != None:
+                    STALE_sensors = str(STALE_sensors) + str(parse_name) + str(', ')
+                  else:
+                    STALE_sensors = str(parse_name) + str(', ')       
+        
         ready = True
 
     time = rospy.get_time()
-    #kobuki_percentage = int(float(kobuki_percentage))
     rospy.signal_shutdown(0)
 
 def listener():
-    #rospy.init_node('check_battery_kobuki', anonymous=True,  disable_signals=True, log_level=rospy.DEBUG)
     rospy.init_node('ros_diagnostics', anonymous=True,  disable_signals=True)
-    rospy.Subscriber("diagnostics", DiagnosticArray , callback_kobuki)
+    rospy.Subscriber("diagnostics_agg", DiagnosticArray , callback_kobuki)
     rospy.spin()
 
 def myhook():
 
     description = None
 
+    if STALE_sensors != None:
+        if (description != None):
+          description = str(description) + str("STAKE sensor(s) list: " + str(STALE_sensors))
+        else:
+          description = str("STALE sensor(s) list: " + str(STALE_sensors))
+
     if CRITICAL_sensors != None:
-        description = "CRITICAL sensor(s) list: " + str(CRITICAL_sensors)
+        if (description != None):
+          description = str(description) + str("CRITICAL sensor(s) list: " + str(CRITICAL_sensors))
+        else:
+          description = "CRITICAL sensor(s) list: " + str(CRITICAL_sensors)
 
     if WARNING_sensors != None:
         if (description != None):
@@ -127,7 +136,10 @@ def myhook():
     if description != None:
       description = description[:-2]
 
-    if total_level == CRITICAL:
+    if COUNT_sensors == 0:
+      print "CRITICAL - %s" % (description)
+      exiting(CRITICAL)
+    if total_level >= CRITICAL:
       print "CRITICAL - %s" % (description)
       exiting(CRITICAL)
     elif total_level == WARNING:
